@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Arcanoid</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(135deg,#0f172a,#312e81);font-family:Arial,sans-serif;color:#fff}
+.wrap{display:flex;gap:22px;align-items:flex-start;background:#111827;padding:20px;border-radius:20px;box-shadow:0 20px 60px #0008}
+canvas{display:block;background:#070b16;border:3px solid #475569;border-radius:8px}
+#game{width:600px;height:600px}.side{width:170px}h1{margin:0 0 14px;font-size:34px}
+.box{background:#1f2937;border-radius:12px;padding:13px;margin-bottom:10px}.label{color:#94a3b8;font-size:12px}.value{font-size:24px;font-weight:bold;margin-top:3px}
+button{width:100%;padding:12px;border:0;border-radius:10px;background:#4f46e5;color:white;font-weight:bold;font-size:15px;cursor:pointer}button:hover{background:#4338ca}
+.info{font-size:14px;line-height:1.7;color:#cbd5e1}.msg{min-height:22px;font-weight:bold;margin-bottom:8px}
+@media(max-width:850px){.wrap{transform:scale(.75);transform-origin:center}.side{width:150px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<canvas id="game" width="600" height="600"></canvas>
+<div class="side">
+<h1>🧱 Arcanoid</h1>
+<div id="msg" class="msg"></div>
+<div class="box"><div class="label">PUNKTY</div><div id="score" class="value">0</div></div>
+<div class="box"><div class="label">ŻYCIA</div><div id="lives" class="value">3</div></div>
+<div class="box"><div class="label">POZIOM</div><div id="level" class="value">1</div></div>
+<div class="box info">Sterowanie:<br>🖱️ Mysz / ← →<br><br>Spacja — start<br>P — pauza</div>
+<button id="restart">Nowa gra</button>
+</div>
+</div>
+<script>
+const c=document.getElementById('game'),ctx=c.getContext('2d');
+const W=600,H=600;
+let paddle,ball,bricks,score,lives,level,started,paused,over;
+let keys={},mouseX=W/2,last=0;
+
+function reset(){
+ score=0;lives=3;level=1;started=false;paused=false;over=false;
+ createLevel(); resetBall(); update(); document.getElementById('msg').textContent='Naciśnij Spację, aby zacząć';
+ requestAnimationFrame(loop);
+}
+function createLevel(){
+ const rows=Math.min(5+level-1,8),cols=10,bw=52,bh=22,gap=7;
+ bricks=[];
+ const total=cols*bw+(cols-1)*gap,ox=(W-total)/2;
+ for(let r=0;r<rows;r++)for(let col=0;col<cols;col++)
+  bricks.push({x:ox+col*(bw+gap),y:55+r*(bh+gap),w:bw,h:bh,alive:true,hp:level>3&&r<2?2:1});
+}
+function resetBall(){
+ paddle={x:W/2-55,y:H-35,w:110,h:14,speed:8};
+ ball={x:W/2,y:H-55,r:8,vx:(Math.random()<.5?-1:1)*4,vy:-5};
+}
+function start(){if(!over){started=true;document.getElementById('msg').textContent='';}}
+function update(){
+ document.getElementById('score').textContent=score;
+ document.getElementById('lives').textContent=lives;
+ document.getElementById('level').textContent=level;
+}
+function movePaddle(){
+ if(keys.ArrowLeft)paddle.x-=paddle.speed;
+ if(keys.ArrowRight)paddle.x+=paddle.speed;
+ paddle.x=mouseX-paddle.w/2;
+ if(!keys.ArrowLeft&&!keys.ArrowRight) paddle.x=mouseX-paddle.w/2;
+ paddle.x=Math.max(0,Math.min(W-paddle.w,paddle.x));
+}
+function physics(){
+ movePaddle(); if(!started||paused)return;
+ ball.x+=ball.vx;ball.y+=ball.vy;
+ if(ball.x-ball.r<0){ball.x=ball.r;ball.vx=Math.abs(ball.vx)}
+ if(ball.x+ball.r>W){ball.x=W-ball.r;ball.vx=-Math.abs(ball.vx)}
+ if(ball.y-ball.r<0){ball.y=ball.r;ball.vy=Math.abs(ball.vy)}
+ if(ball.y-ball.r>H){lives--;update();if(lives<=0){over=true;started=false;document.getElementById('msg').textContent='KONIEC GRY'}else{started=false;resetBall();document.getElementById('msg').textContent='Spacja — kolejna piłka'}return}
+ if(ball.y+ball.r>=paddle.y&&ball.y-ball.r<=paddle.y+paddle.h&&ball.x>=paddle.x&&ball.x<=paddle.x+paddle.w&&ball.vy>0){
+  const hit=(ball.x-(paddle.x+paddle.w/2))/(paddle.w/2);
+  ball.vx=hit*6;ball.vy=-Math.sqrt(64-ball.vx*ball.vx);
+ }
+ for(const b of bricks)if(b.alive&&ball.x+ball.r>b.x&&ball.x-ball.r<b.x+b.w&&ball.y+ball.r>b.y&&ball.y-ball.r<b.y+b.h){
+   b.hp--;if(b.hp<=0){b.alive=false;score+=10*level}else score+=5;ball.vy*=-1;break;
+ }
+ if(bricks.every(b=>!b.alive)){
+  level++;score+=100*level;createLevel();resetBall();started=false;document.getElementById('msg').textContent='🎉 Poziom ukończony! Spacja — dalej';update();
+ }
+}
+function draw(){
+ ctx.clearRect(0,0,W,H);
+ ctx.fillStyle='#0b1020';ctx.fillRect(0,0,W,H);
+ for(const b of bricks)if(b.alive){
+  ctx.fillStyle=b.hp===2?'#f59e0b':'#6366f1';ctx.fillRect(b.x,b.y,b.w,b.h);
+  ctx.fillStyle='#ffffff33';ctx.fillRect(b.x,b.y,b.w,4);
+ }
+ ctx.fillStyle='#22d3ee';ctx.fillRect(paddle.x,paddle.y,paddle.w,paddle.h);
+ ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);ctx.fillStyle='#f8fafc';ctx.fill();
+}
+function loop(t){physics();draw();if(!over)requestAnimationFrame(loop);last=t}
+document.addEventListener('keydown',e=>{
+ keys[e.key]=true;
+ if(e.key===' '){e.preventDefault();start()}
+ if(e.key==='p'||e.key==='P'){paused=!paused;document.getElementById('msg').textContent=paused?'PAUZA':(started?'':'Spacja — start')}
+});
+document.addEventListener('keyup',e=>keys[e.key]=false);
+c.addEventListener('mousemove',e=>{const r=c.getBoundingClientRect();mouseX=(e.clientX-r.left)*W/r.width});
+document.getElementById('restart').onclick=reset;
+reset();
+</script>
+</body>
+</html>

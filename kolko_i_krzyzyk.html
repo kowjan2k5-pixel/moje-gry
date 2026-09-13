@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kółko i krzyżyk</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg, #111827, #1e3a8a);
+    color: white;
+  }
+  .game {
+    width: min(92vw, 520px);
+    padding: 28px;
+    text-align: center;
+    background: rgba(17,24,39,.92);
+    border-radius: 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  }
+  h1 { margin: 0 0 8px; font-size: 36px; }
+  #status { min-height: 28px; margin: 12px 0 20px; color: #cbd5e1; }
+  .board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin: auto;
+  }
+  .cell {
+    aspect-ratio: 1;
+    border: 0;
+    border-radius: 16px;
+    background: #334155;
+    color: white;
+    font-size: clamp(48px, 13vw, 76px);
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform .12s, background .12s;
+  }
+  .cell:hover:not(:disabled) { background: #475569; transform: scale(1.03); }
+  .cell:disabled { cursor: default; }
+  .x { color: #60a5fa; }
+  .o { color: #f472b6; }
+  .win { background: #166534 !important; }
+  button#reset {
+    margin-top: 20px;
+    padding: 12px 22px;
+    border: 0;
+    border-radius: 12px;
+    background: #2563eb;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  button#reset:hover { background: #1d4ed8; }
+  .score { margin-top: 16px; color: #94a3b8; }
+</style>
+</head>
+<body>
+<main class="game">
+  <h1>⭕ Kółko i Krzyżyk ❌</h1>
+  <div id="status">Twój ruch — jesteś ❌</div>
+  <div class="board" id="board"></div>
+  <button id="reset">Nowa gra</button>
+  <div class="score" id="score">Wygrane: 0 · Remisy: 0 · Przegrane: 0</div>
+</main>
+
+<script>
+const boardEl = document.getElementById('board');
+const statusEl = document.getElementById('status');
+const scoreEl = document.getElementById('score');
+const resetBtn = document.getElementById('reset');
+
+let board, gameOver, score = {win:0, draw:0, loss:0};
+
+const wins = [
+  [0,1,2],[3,4,5],[6,7,8],
+  [0,3,6],[1,4,7],[2,5,8],
+  [0,4,8],[2,4,6]
+];
+
+function newGame() {
+  board = Array(9).fill('');
+  gameOver = false;
+  render();
+  statusEl.textContent = 'Twój ruch — jesteś ❌';
+}
+
+function render() {
+  boardEl.innerHTML = '';
+  board.forEach((value, i) => {
+    const b = document.createElement('button');
+    b.className = 'cell';
+    b.textContent = value;
+    if (value) b.classList.add(value === 'X' ? 'x' : 'o');
+    b.disabled = gameOver || value !== '';
+    b.addEventListener('click', () => playerMove(i));
+    boardEl.appendChild(b);
+  });
+  scoreEl.textContent = `Wygrane: ${score.win} · Remisy: ${score.draw} · Przegrane: ${score.loss}`;
+}
+
+function winner(b = board) {
+  for (const [a,c,d] of wins) {
+    if (b[a] && b[a] === b[c] && b[a] === b[d]) return {player:b[a], line:[a,c,d]};
+  }
+  return null;
+}
+
+function playerMove(i) {
+  if (gameOver || board[i]) return;
+  board[i] = 'X';
+  finishOrComputer();
+}
+
+function finishOrComputer() {
+  const w = winner();
+  if (w) return endGame(w);
+  if (board.every(Boolean)) return endDraw();
+  statusEl.textContent = 'Ruch komputera — ⭕';
+  render();
+  setTimeout(computerMove, 350);
+}
+
+function computerMove() {
+  if (gameOver) return;
+  const move = bestMove();
+  board[move] = 'O';
+  const w = winner();
+  if (w) return endGame(w);
+  if (board.every(Boolean)) return endDraw();
+  statusEl.textContent = 'Twój ruch — jesteś ❌';
+  render();
+}
+
+function bestMove() {
+  // Najpierw wygrana, potem blokada, potem centrum/narożniki.
+  for (const p of ['O','X']) {
+    for (let i=0;i<9;i++) if (!board[i]) {
+      board[i]=p;
+      if (winner()) { board[i]=''; return i; }
+      board[i]='';
+    }
+  }
+  if (!board[4]) return 4;
+  const corners = [0,2,6,8].filter(i => !board[i]);
+  if (corners.length) return corners[Math.floor(Math.random()*corners.length)];
+  return board.findIndex(v => !v);
+}
+
+function endGame(w) {
+  gameOver = true;
+  if (w.player === 'X') {
+    score.win++;
+    statusEl.textContent = '🎉 Wygrałeś!';
+  } else {
+    score.loss++;
+    statusEl.textContent = '🤖 Komputer wygrał!';
+  }
+  render();
+  w.line.forEach(i => boardEl.children[i].classList.add('win'));
+}
+
+function endDraw() {
+  gameOver = true;
+  score.draw++;
+  statusEl.textContent = '🤝 Remis!';
+  render();
+}
+
+resetBtn.addEventListener('click', newGame);
+newGame();
+</script>
+</body>
+</html>
